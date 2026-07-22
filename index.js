@@ -62,18 +62,21 @@ app.get("/api/personal-dentro", async (req, res) => {
         desc: "",
       };
       return {
-        CODI_PERS: persona.CODI_PERS,
-        APELLIDOS_Y_NOMBRES: persona.APELLIDOS_Y_NOMBRES,
-        CARGO: persona.CARGO,
-        FECHA: persona.FECHA,
-        HORA: persona.HORA,
-        TIPO_MOV: `${mov.tipo}`,
-        TIPO_MOV_DESC: `${mov.desc}`,
-        FECHA_LARGA: persona.FECHA_LARGA,
-        DNI: String(persona.DNI),
+        success: true,
+        personal: {
+          CODI_PERS: persona.CODI_PERS,
+          APELLIDOS_Y_NOMBRES: persona.APELLIDOS_Y_NOMBRES,
+          CARGO: persona.CARGO,
+          FECHA: persona.FECHA,
+          HORA: persona.HORA,
+          TIPO_MOV: `${mov.tipo}`,
+          TIPO_MOV_DESC: `${mov.desc}`,
+          FECHA_LARGA: persona.FECHA_LARGA,
+          DNI: String(persona.DNI),
+        },
       };
     });
-    res.json([{ success: true, personal: data }]);
+    res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
