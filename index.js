@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
-const sql = require("mssql");
 const cors = require("cors");
+const { getPersonalData, invalidateCache } = require("./cache");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,51 +42,45 @@ const tipoMovMap = {
   1026: { tipo: "Salida", desc: "Salida Especial" },
 };
 
+function mapPersona(p) {
+  const mov = tipoMovMap[p.TIPO_MOV] || { tipo: "Desconocido", desc: "" };
+  return {
+    CODI_PERS: p.CODI_PERS,
+    APELLIDOS_Y_NOMBRES: p.APELLIDOS_Y_NOMBRES,
+    CARGO: p.CARGO,
+    FECHA: p.FECHA,
+    HORA: p.HORA,
+    TIPO_MOV: mov.tipo,
+    TIPO_MOV_DESC: mov.desc,
+    FECHA_LARGA: p.FECHA_LARGA,
+    DNI: String(p.DNI),
+  };
+}
+
 app.get("/api/personal", async (req, res) => {
   try {
     const { cargo, tipo_mov_desc, dni, apellidos_y_nombres } = req.query;
 
-    const pool = await sql.connect(config);
-    const result = await pool
-      .request()
-      .input("movimiento_ubicacion_sistema", sql.Int, 1000)
-      .execute("SOLMAR.dbo.USP_OCLOCK_LISTAR_PERSONAL_DENTRO_DEL_EDIFICIO_S");
-
-    let personas = result.recordset;
+    let personas = await getPersonalData(config);
 
     if (cargo)
       personas = personas.filter(
-        (p) => String(p.CARGO).toUpperCase() === cargo.toUpperCase()
+        (p) => String(p.CARGO).toUpperCase() === cargo.toUpperCase(),
       );
     if (tipo_mov_desc)
       personas = personas.filter(
-        (p) => String(p.TIPO_MOV_DESC).toUpperCase() === tipo_mov_desc.toUpperCase()
+        (p) =>
+          String(p.TIPO_MOV_DESC).toUpperCase() === tipo_mov_desc.toUpperCase(),
       );
-    if (dni)
-      personas = personas.filter(
-        (p) => String(p.DNI) === String(dni)
-      );
+    if (dni) personas = personas.filter((p) => String(p.DNI) === String(dni));
     if (apellidos_y_nombres)
       personas = personas.filter((p) =>
-        String(p.APELLIDOS_Y_NOMBRES).toUpperCase().includes(apellidos_y_nombres.toUpperCase())
+        String(p.APELLIDOS_Y_NOMBRES)
+          .toUpperCase()
+          .includes(apellidos_y_nombres.toUpperCase()),
       );
 
-    const personal = personas.map((p) => {
-      const mov = tipoMovMap[p.TIPO_MOV] || { tipo: "Desconocido", desc: "" };
-      return {
-        CODI_PERS: p.CODI_PERS,
-        APELLIDOS_Y_NOMBRES: p.APELLIDOS_Y_NOMBRES,
-        CARGO: p.CARGO,
-        FECHA: p.FECHA,
-        HORA: p.HORA,
-        TIPO_MOV: mov.tipo,
-        TIPO_MOV_DESC: mov.desc,
-        FECHA_LARGA: p.FECHA_LARGA,
-        DNI: String(p.DNI),
-      };
-    });
-
-    res.json({ success: true, personal });
+    res.json({ success: true, personal: personas.map(mapPersona) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -94,14 +88,8 @@ app.get("/api/personal", async (req, res) => {
 
 app.get("/api/cargos", async (req, res) => {
   try {
-    const pool = await sql.connect(config);
-    const result = await pool
-      .request()
-      .input("movimiento_ubicacion_sistema", sql.Int, 1000)
-      .execute("SOLMAR.dbo.USP_OCLOCK_LISTAR_PERSONAL_DENTRO_DEL_EDIFICIO_S");
-
-    const cargos = [...new Set(result.recordset.map((p) => p.CARGO))].sort();
-
+    const personas = await getPersonalData(config);
+    const cargos = [...new Set(personas.map((p) => p.CARGO))].sort();
     res.json({ success: true, cargos });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -114,38 +102,34 @@ app.post("/api/personal-dni", async (req, res) => {
     if (!Array.isArray(dni) || dni.length === 0)
       return res
         .status(400)
-        .json({ success: false, message: "Se requiere un array de DNIs en el body" });
+        .json({
+          success: false,
+          message: "Se requiere un array de DNIs en el body",
+        });
 
-    const pool = await sql.connect(config);
-    const result = await pool
-      .request()
-      .input("movimiento_ubicacion_sistema", sql.Int, 1000)
-      .execute("SOLMAR.dbo.USP_OCLOCK_LISTAR_PERSONAL_DENTRO_DEL_EDIFICIO_S");
-
+    const personas = await getPersonalData(config);
     const dniSet = new Set(dni.map(String));
-    const personas = result.recordset.filter((p) => dniSet.has(String(p.DNI)));
+    const filtradas = personas.filter((p) => dniSet.has(String(p.DNI)));
 
-    if (personas.length === 0)
+    if (filtradas.length === 0)
       return res
         .status(404)
-        .json({ success: false, message: "No se encontró personal con los DNIs proporcionados" });
+        .json({
+          success: false,
+          message: "No se encontró personal con los DNIs proporcionados",
+        });
 
-    const personal = personas.map((p) => {
-      const mov = tipoMovMap[p.TIPO_MOV] || { tipo: "Desconocido", desc: "" };
-      return {
-        CODI_PERS: p.CODI_PERS,
-        APELLIDOS_Y_NOMBRES: p.APELLIDOS_Y_NOMBRES,
-        CARGO: p.CARGO,
-        FECHA: p.FECHA,
-        HORA: p.HORA,
-        TIPO_MOV: mov.tipo,
-        TIPO_MOV_DESC: mov.desc,
-        FECHA_LARGA: p.FECHA_LARGA,
-        DNI: String(p.DNI),
-      };
-    });
+    res.json({ success: true, personal: filtradas.map(mapPersona) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    res.json({ success: true, personal });
+app.post("/api/refresh-cache", async (req, res) => {
+  try {
+    invalidateCache();
+    await getPersonalData(config, { forceRefresh: true });
+    res.json({ success: true, message: "Cache actualizado" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
