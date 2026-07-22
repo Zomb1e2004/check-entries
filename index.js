@@ -80,8 +80,10 @@ app.get("/api/personal", async (req, res) => {
           .includes(apellidos_y_nombres.toUpperCase()),
       );
 
+    console.log("✓ API llamada: /api/personal");
     res.json({ success: true, personal: personas.map(mapPersona) });
   } catch (err) {
+    console.log(`✖ Error: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });
@@ -90,8 +92,10 @@ app.get("/api/cargos", async (req, res) => {
   try {
     const personas = await getPersonalData(config);
     const cargos = [...new Set(personas.map((p) => p.CARGO))].sort();
+    console.log("✓ API llamada: /api/cargos");
     res.json({ success: true, cargos });
   } catch (err) {
+    console.log(`✖ Error: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });
@@ -100,27 +104,25 @@ app.post("/api/personal-dni", async (req, res) => {
   try {
     const { dni } = req.body;
     if (!Array.isArray(dni) || dni.length === 0)
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Se requiere un array de DNIs en el body",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Se requiere un array de DNIs en el body",
+      });
 
     const personas = await getPersonalData(config);
     const dniSet = new Set(dni.map(String));
     const filtradas = personas.filter((p) => dniSet.has(String(p.DNI)));
 
     if (filtradas.length === 0)
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No se encontró personal con los DNIs proporcionados",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "No se encontró personal con los DNIs proporcionados",
+      });
 
+    console.log("✓ API llamada: /api/personal-dni");
     res.json({ success: true, personal: filtradas.map(mapPersona) });
   } catch (err) {
+    console.log(`✖ Error: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });
@@ -129,16 +131,18 @@ app.post("/api/refresh-cache", async (req, res) => {
   try {
     invalidateCache();
     await getPersonalData(config, { forceRefresh: true });
+    console.log("✓ API llamada: /api/refresh-cache");
     res.json({ success: true, message: "Cache actualizado" });
   } catch (err) {
+    console.log(`✖ Error: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });
 
 app.listen(PORT, () => {
   if (process.env.NODE_ENV === "production") {
-    console.log("Servidor en marcha");
+    console.log("✓ Servidor en marcha ");
   } else {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`✓ Servidor corriendo en http://localhost:${PORT}`);
   }
 });
