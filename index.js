@@ -49,19 +49,17 @@ app.get("/api/personal-dentro", async (req, res) => {
       .request()
       .input("movimiento_ubicacion_sistema", sql.Int, 1000)
       .execute("SOLMAR.dbo.USP_OCLOCK_LISTAR_PERSONAL_DENTRO_DEL_EDIFICIO_S");
-    const personas = result.recordset.filter((p) =>
-      ["41882033", "76138093"].includes(String(p.DNI))
-    );
-    if (!personas.length)
+    const persona = result.recordset.find((p) => String(p.DNI) === "41882033");
+    if (!persona)
       return res
         .status(404)
         .json({ success: false, message: "Personal no encontrado" });
-    const data = personas.map((persona) => {
-      const mov = tipoMovMap[persona.TIPO_MOV] || {
-        tipo: "Desconocido",
-        desc: "",
-      };
-      return {
+    const mov = tipoMovMap[persona.TIPO_MOV] || {
+      tipo: "Desconocido",
+      desc: "",
+    };
+    res.json([
+      {
         success: true,
         personal: {
           CODI_PERS: persona.CODI_PERS,
@@ -74,9 +72,8 @@ app.get("/api/personal-dentro", async (req, res) => {
           FECHA_LARGA: persona.FECHA_LARGA,
           DNI: String(persona.DNI),
         },
-      };
-    });
-    res.json(data);
+      },
+    ]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
