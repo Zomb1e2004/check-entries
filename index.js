@@ -136,5 +136,9 @@ app.post("/api/refresh-cache", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  if (process.env.NODE_ENV === "production") {
+    console.log("Servidor en marcha");
+  } else {
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  }
 });
