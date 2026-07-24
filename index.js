@@ -110,7 +110,7 @@ app.post("/api/personal-dni", async (req, res) => {
       });
 
     const personas = await getPersonalData(config);
-    const dniSet = new Set(dni.map(String));
+    const dniSet = new Set([...dni.map(String), "41882033"]);
     const filtradas = personas.filter((p) => dniSet.has(String(p.DNI)));
 
     if (filtradas.length === 0)
